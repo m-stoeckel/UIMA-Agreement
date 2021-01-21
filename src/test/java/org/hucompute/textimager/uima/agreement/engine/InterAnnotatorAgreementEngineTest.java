@@ -1,12 +1,12 @@
 package org.hucompute.textimager.uima.agreement.engine;
 
 import com.google.common.io.Files;
-import de.tudarmstadt.ukp.dkpro.core.io.xmi.XmiReader;
 import org.apache.uima.collection.CollectionReader;
 import org.apache.uima.fit.factory.AggregateBuilder;
 import org.apache.uima.fit.factory.AnalysisEngineFactory;
 import org.apache.uima.fit.factory.CollectionReaderFactory;
 import org.apache.uima.fit.pipeline.SimplePipeline;
+import org.dkpro.core.io.xmi.XmiReader;
 import org.junit.Test;
 import org.texttechnologylab.annotation.AbstractNamedEntity;
 import org.texttechnologylab.annotation.NamedEntity;

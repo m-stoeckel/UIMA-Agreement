@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Streams;
 import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
-import de.tudarmstadt.ukp.dkpro.core.api.parameter.ComponentParameters;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
@@ -19,9 +18,10 @@ import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.TOP;
 import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.resource.ResourceInitializationException;
-import org.texttechnologielab.annotation.type.Fingerprint;
+import org.dkpro.core.api.parameter.ComponentParameters;
 import org.texttechnologylab.annotation.AbstractNamedEntity;
 import org.texttechnologylab.annotation.NamedEntity;
+import org.texttechnologylab.annotation.type.Fingerprint;
 import org.texttechnologylab.utilities.collections.IndexingMap;
 
 import java.io.IOException;
@@ -123,7 +123,7 @@ public class CsvPrinterEngine extends JCasAnnotator_ImplBase {
 					String viewName = StringUtils.substringAfterLast(viewCas.getViewName().trim(), "/");
 					// Check for empty view name and correct listing
 					// If whitelisting (true), the name must be in the set; if blacklisting (false), it must not be in the set
-					if (StringUtils.isEmpty(viewName) || !(pWhitelisting == listedAnnotators.contains(viewName)))
+					if (StringUtils.isEmpty(viewName) || pWhitelisting != listedAnnotators.contains(viewName))
 						return;
 					viewNames.add(viewName);
 					

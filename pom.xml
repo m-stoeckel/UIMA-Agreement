@@ -86,6 +86,18 @@
             <artifactId>dkpro-core-api-xml-asl</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.dkpro.core</groupId>
+            <artifactId>dkpro-core-api-segmentation-asl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dkpro.core</groupId>
+            <artifactId>dkpro-core-api-metadata-asl</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.dkpro.core</groupId>
+            <artifactId>dkpro-core-api-io-asl</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.json</groupId>
             <artifactId>json</artifactId>
             <version>20190722</version>
@@ -93,13 +105,29 @@
         <dependency>
             <groupId>com.github.texttechnologylab</groupId>
             <artifactId>UIMATypeSystem</artifactId>
-            <version>1.7.5</version>
+            <version>1.8.2</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>com.github.texttechnologylab</groupId>
             <artifactId>Utilities</artifactId>
-            <version>1.0.5</version>
+            <version>1.0.7-uima-2.10.4</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>de.tudarmstadt.ukp.dkpro.core</groupId>
+                    <artifactId>de.tudarmstadt.ukp.dkpro.core.api.metadata-asl</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>2.12.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>2.12.1</version>
         </dependency>
     </dependencies>
 
