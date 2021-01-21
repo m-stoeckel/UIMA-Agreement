@@ -1,4 +1,4 @@
-package org.hucompute.textimager.uima.agreement.engine;
+package org.hucompute.textimager.uima.agreement.engine.coding;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -115,4 +115,3 @@ public class SetCodingAnnotationStudy extends CodingAnnotationStudy {
 		return krippendorffAlphaAgreement.calculateItemAgreement(dummyStudy.addItemAsArray(getAnnotations(strings)));
 	}
 }
-

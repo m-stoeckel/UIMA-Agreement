@@ -1,4 +1,4 @@
-package org.hucompute.textimager.uima.agreement.engine;
+package org.hucompute.textimager.uima.agreement.engine.serialization;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -19,6 +19,7 @@ import org.apache.uima.jcas.cas.TOP;
 import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.resource.ResourceInitializationException;
 import org.dkpro.core.api.parameter.ComponentParameters;
+import org.hucompute.textimager.uima.agreement.engine.AbstractIAAEngine;
 import org.texttechnologylab.annotation.AbstractNamedEntity;
 import org.texttechnologylab.annotation.NamedEntity;
 import org.texttechnologylab.annotation.type.Fingerprint;

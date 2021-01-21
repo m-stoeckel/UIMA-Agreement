@@ -1,4 +1,4 @@
-package org.hucompute.textimager.uima.agreement.engine;
+package org.hucompute.textimager.uima.agreement.engine.ttlab;
 
 import com.google.common.collect.ImmutableSortedSet;
 import org.apache.commons.lang3.StringUtils;
@@ -8,6 +8,7 @@ import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.resource.ResourceInitializationException;
 import org.dkpro.statistics.agreement.unitizing.KrippendorffAlphaUnitizingAgreement;
 import org.dkpro.statistics.agreement.unitizing.UnitizingAnnotationStudy;
+import org.hucompute.textimager.uima.agreement.engine.unitizing.UnitizingIAACollectionProcessingEngine;
 import org.texttechnologylab.annotation.AbstractNamedEntity;
 import org.texttechnologylab.annotation.NamedEntity;
 
@@ -66,12 +67,14 @@ public class TTLabUnitizingIAACollectionProcessingEngine extends UnitizingIAACol
 		if (StringUtils.isNotEmpty(pPrunePrefix))
 			category = category.replaceFirst(pPrunePrefix, "");
 		if (annotation instanceof NamedEntity) {
+//			category = "Concrete";
 			NamedEntity namedEntity = (NamedEntity) annotation;
 			if (includeFlags.contains(METAPHOR) && namedEntity.getMetaphor())
 				category += "-" + METAPHOR;
 			if (includeFlags.contains(METONYM) && namedEntity.getMetonym())
 				category += "-" + METONYM;
 		} else if (annotation instanceof AbstractNamedEntity) {
+//			category = "Concept";
 			AbstractNamedEntity namedEntity = (AbstractNamedEntity) annotation;
 			if (includeFlags.contains(METAPHOR) && namedEntity.getMetaphor())
 				category += "-" + METAPHOR;

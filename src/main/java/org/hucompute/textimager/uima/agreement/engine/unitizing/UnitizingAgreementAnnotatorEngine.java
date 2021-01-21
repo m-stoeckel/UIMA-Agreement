@@ -1,4 +1,4 @@
-package org.hucompute.textimager.uima.agreement.engine;
+package org.hucompute.textimager.uima.agreement.engine.unitizing;
 
 import eu.openminted.share.annotations.api.Parameters;
 import org.apache.uima.UimaContext;
@@ -6,6 +6,7 @@ import org.apache.uima.analysis_engine.AnalysisEngineProcessException;
 import org.apache.uima.resource.ResourceInitializationException;
 import org.dkpro.statistics.agreement.ICategorySpecificAgreement;
 import org.dkpro.statistics.agreement.unitizing.KrippendorffAlphaUnitizingAgreement;
+import org.hucompute.textimager.uima.agreement.engine.AbstractIAAEngine;
 
 /**
  * Inter-annotator agreement engine using a {@link org.dkpro.statistics.agreement.unitizing.UnitizingAnnotationStudy UnitizingAnnotationStudy} and
@@ -31,7 +32,7 @@ public class UnitizingAgreementAnnotatorEngine extends UnitizingIAACollectionPro
 	public void initialize(UimaContext context) throws ResourceInitializationException {
 		super.initialize(context);
 		pAnnotateDocument = true;
-		pMultiCasHandling = SEPARATE;
+		pMultiCasHandling = AbstractIAAEngine.SEPARATE;
 	}
 	
 	@Override

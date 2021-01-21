@@ -1,4 +1,4 @@
-package org.hucompute.textimager.uima.agreement.engine;
+package org.hucompute.textimager.uima.agreement.engine.ttlab;
 
 import com.google.common.collect.ImmutableSortedSet;
 import org.apache.commons.lang3.StringUtils;
@@ -8,6 +8,7 @@ import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.resource.ResourceInitializationException;
 import org.dkpro.statistics.agreement.ICategorySpecificAgreement;
 import org.dkpro.statistics.agreement.coding.*;
+import org.hucompute.textimager.uima.agreement.engine.coding.CodingIAACollectionProcessingEngine;
 import org.texttechnologylab.annotation.AbstractNamedEntity;
 import org.texttechnologylab.annotation.NamedEntity;
 

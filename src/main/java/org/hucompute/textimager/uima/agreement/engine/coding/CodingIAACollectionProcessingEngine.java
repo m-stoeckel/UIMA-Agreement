@@ -1,4 +1,4 @@
-package org.hucompute.textimager.uima.agreement.engine;
+package org.hucompute.textimager.uima.agreement.engine.coding;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -19,6 +19,7 @@ import org.dkpro.statistics.agreement.IAgreementMeasure;
 import org.dkpro.statistics.agreement.ICategorySpecificAgreement;
 import org.dkpro.statistics.agreement.coding.*;
 import org.dkpro.statistics.agreement.distance.NominalDistanceFunction;
+import org.hucompute.textimager.uima.agreement.engine.AbstractIAAEngine;
 import org.texttechnologylab.annotation.type.Fingerprint;
 import org.texttechnologylab.iaa.Agreement;
 import org.texttechnologylab.utilities.collections.CountMap;

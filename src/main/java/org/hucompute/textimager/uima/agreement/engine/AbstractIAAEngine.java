@@ -54,7 +54,7 @@ public abstract class AbstractIAAEngine extends JCasConsumer_ImplBase {
 	protected CSVFormat csvFormat = CSVFormat.DEFAULT.withCommentMarker('#').withDelimiter(';');
 	@ConfigurationParameter(name = PARAM_ANNOTATION_CLASSES, mandatory = false)
 	private String[] pAnnotationClasses;
-	ImmutableSet<Class<? extends Annotation>> annotationClasses = ImmutableSet.of(Annotation.class);
+	protected ImmutableSet<Class<? extends Annotation>> annotationClasses = ImmutableSet.of(Annotation.class);
 
 	/**
 	 * Defines the relation of the given annotators:
@@ -124,7 +124,7 @@ public abstract class AbstractIAAEngine extends JCasConsumer_ImplBase {
 			mandatory = false,
 			defaultValue = "true"
 	)
-	Boolean pPrintStatistics;
+	protected Boolean pPrintStatistics;
 
 	/**
 	 * Possible aggregation methods for the calculation of the inter-annotator agreement values:
@@ -140,7 +140,7 @@ public abstract class AbstractIAAEngine extends JCasConsumer_ImplBase {
 			mandatory = false,
 			defaultValue = COMBINED
 	)
-	String pMultiCasHandling;
+	protected String pMultiCasHandling;
 
 	/**
 	 * {@link AbstractIAAEngine#PARAM_MULTI_CAS_HANDLING} choice. Process each of the CAS separately and output their
@@ -199,11 +199,11 @@ public abstract class AbstractIAAEngine extends JCasConsumer_ImplBase {
 			description = "Set false to disable document level IAA annotations. Default value: true. Has no effect when " +
 					"PARAM_MULTI_CAS_HANDLING is set to 'COMBINED'."
 	)
-	Boolean pAnnotateDocument;
+	protected Boolean pAnnotateDocument;
 
 	protected ExtendedLogger logger;
-	long viewCount;
-	LinkedHashSet<String> validViewNames;
+	protected long viewCount;
+	protected LinkedHashSet<String> validViewNames;
 	private CSVPrinter globalCsvPrinter;
 
 	@Override
@@ -264,7 +264,7 @@ public abstract class AbstractIAAEngine extends JCasConsumer_ImplBase {
 		}
 	}
 
-	CSVPrinter getCsvPrinter(@Nonnull String suffix) throws IOException {
+	protected CSVPrinter getCsvPrinter(@Nonnull String suffix) throws IOException {
 		Appendable targetAppendable;
 		switch (targetLocation) {
 			case "System.out":
@@ -393,7 +393,7 @@ public abstract class AbstractIAAEngine extends JCasConsumer_ImplBase {
 	}
 
 	@Nonnull
-	ArrayList<? extends Annotation> getAnnotations(JCas viewCas, HashSet<TOP> fingerprinted, Class<? extends Annotation> annotationClass) {
+	protected ArrayList<? extends Annotation> getAnnotations(JCas viewCas, HashSet<TOP> fingerprinted, Class<? extends Annotation> annotationClass) {
 		ArrayList<? extends Annotation> annotations;
 		if (pFilterFingerprinted)
 			annotations = JCasUtil.select(viewCas, annotationClass).stream()

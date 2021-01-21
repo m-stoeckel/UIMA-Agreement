@@ -1,4 +1,4 @@
-package org.hucompute.textimager.uima.agreement.engine;
+package org.hucompute.textimager.uima.agreement.engine.unitizing;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
@@ -16,6 +16,7 @@ import org.apache.uima.jcas.tcas.Annotation;
 import org.dkpro.statistics.agreement.unitizing.IUnitizingAnnotationUnit;
 import org.dkpro.statistics.agreement.unitizing.KrippendorffAlphaUnitizingAgreement;
 import org.dkpro.statistics.agreement.unitizing.UnitizingAnnotationStudy;
+import org.hucompute.textimager.uima.agreement.engine.AbstractIAAEngine;
 import org.texttechnologylab.annotation.type.Fingerprint;
 import org.texttechnologylab.utilities.collections.CountMap;
 import org.texttechnologylab.utilities.collections.IndexingMap;
