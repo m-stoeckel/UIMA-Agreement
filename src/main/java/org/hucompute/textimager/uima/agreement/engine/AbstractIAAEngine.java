@@ -51,10 +51,9 @@ public abstract class AbstractIAAEngine extends JCasConsumer_ImplBase {
 	 * Adding classes which extend other given classes might return unexpected results.
 	 */
 	public static final String PARAM_ANNOTATION_CLASSES = "pAnnotationClasses";
-	protected CSVFormat csvFormat = CSVFormat.DEFAULT.withCommentMarker('#').withDelimiter(';');
 	@ConfigurationParameter(name = PARAM_ANNOTATION_CLASSES, mandatory = false)
-	private String[] pAnnotationClasses;
-	protected ImmutableSet<Class<? extends Annotation>> annotationClasses = ImmutableSet.of(Annotation.class);
+	protected String[] pAnnotationClasses;
+	protected ImmutableSet<Class<? extends Annotation>> annotationClasses = ImmutableSet.of();
 
 	/**
 	 * Defines the relation of the given annotators:
@@ -204,16 +203,25 @@ public abstract class AbstractIAAEngine extends JCasConsumer_ImplBase {
 	protected ExtendedLogger logger;
 	protected long viewCount;
 	protected LinkedHashSet<String> validViewNames;
+	protected CSVFormat csvFormat = CSVFormat.DEFAULT.withCommentMarker('#').withDelimiter(';');
 	private CSVPrinter globalCsvPrinter;
 
 	@Override
 	public void initialize(UimaContext context) throws ResourceInitializationException {
 		super.initialize(context);
 		logger = getLogger();
-		ArrayList<Class<? extends Annotation>> classArrayList = new ArrayList<>();
+
+		// Set the list of annotators
+		if (pAnnotatorList != null && pAnnotatorList.length > 0) {
+			listedAnnotators = ImmutableSet.copyOf(pAnnotatorList);
+		}
+		if (!listedAnnotators.isEmpty()) {
+			logger.info(String.format("%s annotators with ids: %s", pRelation ? "Whitelisting" : "Blacklisting", listedAnnotators.toString()));
+		}
 
 		// If class names were passed as parameters, update the annotationClasses set
 		if (pAnnotationClasses != null && pAnnotationClasses.length > 0) {
+			ArrayList<Class<? extends Annotation>> classArrayList = new ArrayList<>();
 			for (String pAnnotationClass : pAnnotationClasses) {
 				// Get a class from its class name and cast it to Class<? extends Annotation>
 				try {
@@ -229,15 +237,7 @@ public abstract class AbstractIAAEngine extends JCasConsumer_ImplBase {
 			if (classArrayList.size() > 0)
 				annotationClasses = ImmutableSet.copyOf(classArrayList);
 		}
-
-		// Set the list of annotators
-		if (pAnnotatorList != null && pAnnotatorList.length > 0) {
-			listedAnnotators = ImmutableSet.copyOf(pAnnotatorList);
-		}
 		logger.info("Computing inter-annotator agreement for subclasses of " + annotationClasses.toString());
-		if (!listedAnnotators.isEmpty()) {
-			logger.info(String.format("%s annotators with ids: %s", pRelation ? "Whitelisting" : "Blacklisting", listedAnnotators.toString()));
-		}
 
 
 		if (!Arrays.asList("System.out", "System.err").contains(targetLocation)) {
