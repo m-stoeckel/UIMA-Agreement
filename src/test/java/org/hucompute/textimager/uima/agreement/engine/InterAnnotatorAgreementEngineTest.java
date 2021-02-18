@@ -7,9 +7,7 @@ import org.apache.uima.fit.factory.AnalysisEngineFactory;
 import org.apache.uima.fit.factory.CollectionReaderFactory;
 import org.apache.uima.fit.pipeline.SimplePipeline;
 import org.dkpro.core.io.xmi.XmiReader;
-import org.hucompute.textimager.uima.agreement.engine.coding.SetSelectionStrategy;
 import org.hucompute.textimager.uima.agreement.engine.serialization.CsvPrinterEngine;
-import org.hucompute.textimager.uima.agreement.engine.ttlab.TTLabCodingIAACollectionProcessingEngine;
 import org.hucompute.textimager.uima.agreement.engine.ttlab.TTLabUnitizingIAACollectionProcessingEngine;
 import org.hucompute.textimager.uima.agreement.engine.unitizing.UnitizingIAACollectionProcessingEngine;
 import org.junit.Test;
@@ -30,8 +28,7 @@ public class InterAnnotatorAgreementEngineTest {
 		try {
 			final boolean download = false;
 
-			String xmiPath = "src/test/resources/out/xmi/";
-//			String xmiPath = "../Utilities/src/test/out/xmi/";
+			String xmiPath = System.getenv("HOME") + "/BIOfid/data/export/TA-2021.01.18/";
 			CollectionReader collection;
 			if (download) {
 				String txtPath = "src/test/resources/out/txt/";
@@ -49,7 +46,7 @@ public class InterAnnotatorAgreementEngineTest {
 			} else {
 				collection = CollectionReaderFactory.createReader(
 						XmiReader.class,
-						XmiReader.PARAM_PATTERNS, "[+]**.xmi",
+						XmiReader.PARAM_PATTERNS, new String[]{"[+]3673151.xmi", "[+]4497041.xmi"},
 						XmiReader.PARAM_SOURCE_LOCATION, xmiPath,
 						XmiReader.PARAM_LENIENT, true
 //						, XmiReader.PARAM_LOG_FREQ, -1
@@ -92,48 +89,47 @@ public class InterAnnotatorAgreementEngineTest {
 					TTLabUnitizingIAACollectionProcessingEngine.PARAM_TARGET_LOCATION, "src/test/resources/out/unitizing"
 			));
 
-			String[] codingIncludeFlags = new String[]{TTLabCodingIAACollectionProcessingEngine.METAPHOR, TTLabCodingIAACollectionProcessingEngine.METONYM, TTLabCodingIAACollectionProcessingEngine.SPECIFIC};
-			ab.add(AnalysisEngineFactory.createEngineDescription(
-					TTLabCodingIAACollectionProcessingEngine.class,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATION_CLASSES, annotationClasses,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_INCLUDE_FLAGS, codingIncludeFlags,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_MIN_VIEWS, 2,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, TTLabCodingIAACollectionProcessingEngine.WHITELIST,
-//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorBlacklist,
-//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, UnitizingIAACollectionProcessingEngine.BLACKLIST,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_FILTER_FINGERPRINTED, filterFingerprinted,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_AGREEMENT_MEASURE, TTLabCodingIAACollectionProcessingEngine.KrippendorffAlphaAgreement,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_SET_SELECTION_STRATEGY, SetSelectionStrategy.MAX,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_MULTI_CAS_HANDLING, TTLabCodingIAACollectionProcessingEngine.BOTH,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_MIN_ANNOTATIONS, 10,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_TARGET_LOCATION, "src/test/resources/out/coding/"
-			));
-			ab.add(AnalysisEngineFactory.createEngineDescription(
-					TTLabCodingIAACollectionProcessingEngine.class,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATION_CLASSES, annotationClasses,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_INCLUDE_FLAGS, codingIncludeFlags,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_MIN_VIEWS, 2,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, TTLabCodingIAACollectionProcessingEngine.WHITELIST,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_FILTER_FINGERPRINTED, filterFingerprinted,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_AGREEMENT_MEASURE, TTLabCodingIAACollectionProcessingEngine.PercentageAgreement,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_SET_SELECTION_STRATEGY, SetSelectionStrategy.MAX,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_MULTI_CAS_HANDLING, TTLabCodingIAACollectionProcessingEngine.BOTH
-			));
-			ab.add(AnalysisEngineFactory.createEngineDescription(
-					TTLabCodingIAACollectionProcessingEngine.class,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATION_CLASSES, annotationClasses,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_INCLUDE_FLAGS, codingIncludeFlags,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_MIN_VIEWS, 2,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, TTLabCodingIAACollectionProcessingEngine.WHITELIST,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_FILTER_FINGERPRINTED, filterFingerprinted,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_AGREEMENT_MEASURE, TTLabCodingIAACollectionProcessingEngine.FleissKappaAgreement,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_SET_SELECTION_STRATEGY, SetSelectionStrategy.ALL,
-					TTLabCodingIAACollectionProcessingEngine.PARAM_MULTI_CAS_HANDLING, TTLabCodingIAACollectionProcessingEngine.BOTH
-			));
-//			SimplePipeline.runPipeline(collection, agreementEngine);
+//			String[] codingIncludeFlags = new String[]{TTLabCodingIAACollectionProcessingEngine.METAPHOR, TTLabCodingIAACollectionProcessingEngine.METONYM, TTLabCodingIAACollectionProcessingEngine.SPECIFIC};
+//			ab.add(AnalysisEngineFactory.createEngineDescription(
+//					TTLabCodingIAACollectionProcessingEngine.class,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATION_CLASSES, annotationClasses,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_INCLUDE_FLAGS, codingIncludeFlags,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_MIN_VIEWS, 2,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, TTLabCodingIAACollectionProcessingEngine.WHITELIST,
+////					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorBlacklist,
+////					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, UnitizingIAACollectionProcessingEngine.BLACKLIST,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_FILTER_FINGERPRINTED, filterFingerprinted,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_AGREEMENT_MEASURE, TTLabCodingIAACollectionProcessingEngine.KrippendorffAlphaAgreement,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_SET_SELECTION_STRATEGY, SetSelectionStrategy.MAX,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_MULTI_CAS_HANDLING, TTLabCodingIAACollectionProcessingEngine.BOTH,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_MIN_ANNOTATIONS, 10,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_TARGET_LOCATION, "src/test/resources/out/coding/"
+//			));
+//			ab.add(AnalysisEngineFactory.createEngineDescription(
+//					TTLabCodingIAACollectionProcessingEngine.class,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATION_CLASSES, annotationClasses,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_INCLUDE_FLAGS, codingIncludeFlags,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_MIN_VIEWS, 2,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, TTLabCodingIAACollectionProcessingEngine.WHITELIST,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_FILTER_FINGERPRINTED, filterFingerprinted,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_AGREEMENT_MEASURE, TTLabCodingIAACollectionProcessingEngine.PercentageAgreement,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_SET_SELECTION_STRATEGY, SetSelectionStrategy.MAX,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_MULTI_CAS_HANDLING, TTLabCodingIAACollectionProcessingEngine.BOTH
+//			));
+//			ab.add(AnalysisEngineFactory.createEngineDescription(
+//					TTLabCodingIAACollectionProcessingEngine.class,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATION_CLASSES, annotationClasses,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_INCLUDE_FLAGS, codingIncludeFlags,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_MIN_VIEWS, 2,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, TTLabCodingIAACollectionProcessingEngine.WHITELIST,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_FILTER_FINGERPRINTED, filterFingerprinted,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_AGREEMENT_MEASURE, TTLabCodingIAACollectionProcessingEngine.FleissKappaAgreement,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_SET_SELECTION_STRATEGY, SetSelectionStrategy.ALL,
+//					TTLabCodingIAACollectionProcessingEngine.PARAM_MULTI_CAS_HANDLING, TTLabCodingIAACollectionProcessingEngine.BOTH
+//			));
 			SimplePipeline.runPipeline(collection, ab.createAggregate());
 		} catch (Exception e) {
 			e.printStackTrace();

@@ -2,6 +2,7 @@ package org.hucompute.textimager.uima.agreement.engine.relational;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import com.google.common.collect.Streams;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import de.tudarmstadt.ukp.dkpro.core.api.semantics.type.WordSense;
@@ -16,6 +17,7 @@ import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.TOP;
 import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.resource.ResourceInitializationException;
+import org.dkpro.statistics.agreement.IAnnotationUnit;
 import org.dkpro.statistics.agreement.coding.CodingAnnotationStudy;
 import org.dkpro.statistics.agreement.coding.ICodingAnnotationItem;
 import org.dkpro.statistics.agreement.coding.KrippendorffAlphaAgreement;
@@ -77,6 +79,7 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
 
             UnitizingAnnotationStudy perCasArgumentIdentificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
             UnitizingAnnotationStudy perCasArgumentClassificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy perCasArgumentClassificationMatchingSpansStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
 
             // Count all annotations for PARAM_MIN_ANNOTATIONS
             CountMap<String> perViewAnnotationCount = new CountMap<>();
@@ -189,9 +192,10 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
                         // Check if all sense labels for the current predicate match
                         // TODO: Check if this is necessary.
                         if (Arrays.stream(propbankDisambiguationAnnotationLabels).allMatch(Predicate.isEqual(propbankDisambiguationAnnotationLabels[0]))) {
-                            for (int annotatorIndex = 0; annotatorIndex < predicateIdentificationAnnotations.length; annotatorIndex++) {
-                                Entity predicate = predicateIdentificationAnnotations[annotatorIndex];
-                                AnnotationContainer annotationContainer = perViewSRLContainers.get(annotatorIndex);
+                            HashMap<ImmutablePair<Integer, Integer>, HashMap<Integer, String>> argumentDisambiguationSpans = new HashMap<>();
+                            for (int raterIndex = 0; raterIndex < annotatorIndex.size(); raterIndex++) {
+                                Entity predicate = predicateIdentificationAnnotations[raterIndex];
+                                AnnotationContainer annotationContainer = perViewSRLContainers.get(raterIndex);
                                 HashMap<Entity, String> argumentsOfPredicate = annotationContainer.predicateArgumentLookup.get(predicate);
                                 for (Map.Entry<Entity, String> argumentAndLabel : argumentsOfPredicate.entrySet()) {
                                     Entity argument = argumentAndLabel.getKey();
@@ -199,7 +203,7 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
                                     /// Argument Identification
                                     createAnnotation(
                                             perCasArgumentIdentificationStudy,
-                                            annotatorIndex,
+                                            raterIndex,
                                             annotationContainer.argumentTokenLookup.get(argument),
                                             annotationContainer.tokenIndexingMap,
                                             "ARG"
@@ -207,25 +211,48 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
 
                                     /// Argument Disambiguation
                                     String label = argumentAndLabel.getValue();
-                                    createAnnotation(
+                                    ImmutablePair<Integer, Integer> beginLengthPair = createAnnotation(
                                             perCasArgumentClassificationStudy,
-                                            annotatorIndex,
+                                            raterIndex,
                                             annotationContainer.argumentTokenLookup.get(argument),
                                             annotationContainer.tokenIndexingMap,
                                             label
                                     );
+
+                                    if (beginLengthPair != null) {
+                                        HashMap<Integer, String> annotatorLabelMap = argumentDisambiguationSpans.getOrDefault(beginLengthPair, new HashMap<>());
+                                        annotatorLabelMap.put(raterIndex, label);
+                                        argumentDisambiguationSpans.put(beginLengthPair, annotatorLabelMap);
+                                    }
                                 }
                             }
+                            argumentDisambiguationSpans.forEach((span, annotatorMap) -> {
+                                if (annotatorMap.size() == annotatorIndex.size()) {
+                                    // All annotators agree about this span
+                                    annotatorMap.forEach((raterIndex, label) -> {
+                                        perCasArgumentClassificationMatchingSpansStudy.addUnit(
+                                                span.getLeft(),
+                                                span.getRight(),
+                                                raterIndex,
+                                                label
+                                        );
+                                    });
+                                }
+                            });
                         }
                     }
                 }
             }
-            System.out.printf("Predicate Identification Agreement: %f, %d items\n", new KrippendorffAlphaAgreement(predicateIdentificationStudy, new NominalDistanceFunction()).calculateAgreement(), predicateIdentificationStudy.getItemCount());
+            long predicateIdentificationPositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).anyMatch(Predicate.isEqual("P"))).count();
+            long predicateIdentificationDoublePositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).allMatch(Predicate.isEqual("P"))).count();
+            System.out.printf("Predicate Identification Agreement: %f, %d items, %d double positive\n", new KrippendorffAlphaAgreement(predicateIdentificationStudy, new NominalDistanceFunction()).calculateAgreement(), predicateIdentificationPositiveSamples, predicateIdentificationDoublePositiveSamples);
             System.out.println("Predicate Disambiguation Agreement");
             System.out.printf("  TTLab:    %f, %d items\n", new KrippendorffAlphaAgreement(ttlabPredicateDisambiguationCodingStudy, new NominalDistanceFunction()).calculateAgreement(), ttlabPredicateDisambiguationCodingStudy.getItemCount());
             System.out.printf("  PropBank: %f, %d items\n", new KrippendorffAlphaAgreement(propBankPredicateDisambiguationCodingStudy, new NominalDistanceFunction()).calculateAgreement(), propBankPredicateDisambiguationCodingStudy.getItemCount());
             System.out.printf("Argument Identification Agreement: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasArgumentIdentificationStudy).calculateAgreement(), perCasArgumentIdentificationStudy.getUnitCount());
-            System.out.printf("Argument Classification Agreement: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasArgumentClassificationStudy).calculateAgreement(), perCasArgumentClassificationStudy.getUnitCount());
+            System.out.println("Argument Classification Agreement");
+            System.out.printf("  All Spans: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasArgumentClassificationStudy).calculateAgreement(), perCasArgumentClassificationStudy.getUnitCount());
+            System.out.printf("  Matching Spans: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasArgumentClassificationMatchingSpansStudy.getUnitCount());
             System.out.flush();
 
             documentOffset.getAndAdd(documentLength);
@@ -260,15 +287,15 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
      * Create an annotation in the given unitizing study for the given annotator.
      * This method will establish the span of the annotation by finding min/max of begin/end of the tokens in the
      * 'containedTokens' collection.
-     *
-     * @param unitizingAnnotationStudy The study to add the unit to.
+     *  @param unitizingAnnotationStudy The study to add the unit to.
      * @param raterIdx The rater index of the annotation.
      * @param containedTokens The tokens contained within / covered by the annotation in question.
      * @param tokenIndexingMap An {@link IndexingMap IndexingMap<Token>} that will be used to determine min/max of the
-     *                        start and end indices of the contained tokens.
+*                        start and end indices of the contained tokens.
      * @param category The category label of the unit.
+     * @return
      */
-    private void createAnnotation(
+    private ImmutablePair<Integer, Integer> createAnnotation(
             UnitizingAnnotationStudy unitizingAnnotationStudy,
             Integer raterIdx,
             Collection<Token> containedTokens,
@@ -293,7 +320,7 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
 
         if (end == Integer.MIN_VALUE || begin == Integer.MAX_VALUE) {
             logger.error("Error during annotation boundary detection!");
-            return;
+            return null;
         }
 
         int length = end - begin + 1;
@@ -304,6 +331,7 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
                 category
         );
         categories.add(category);
+        return new ImmutablePair<>(begin, length);
     }
 
     public class AnnotationContainer {

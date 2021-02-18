@@ -21,7 +21,7 @@ public class RelationAgreementTest {
             String xmiPath = System.getenv("HOME") + "/BIOfid/data/export/TA-2021.02.17/";
             CollectionReader collection  = CollectionReaderFactory.createReader(
                         XmiReader.class,
-                        XmiReader.PARAM_PATTERNS, "[+]3673151.xmi",
+                    XmiReader.PARAM_PATTERNS, new String[]{"[+]3673151.xmi", "[+]4497041.xmi"},
                         XmiReader.PARAM_SOURCE_LOCATION, xmiPath,
                         XmiReader.PARAM_LENIENT, true
 //						, XmiReader.PARAM_LOG_FREQ, -1
