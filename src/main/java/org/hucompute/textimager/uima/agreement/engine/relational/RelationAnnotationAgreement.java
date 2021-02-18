@@ -3,6 +3,7 @@ package org.hucompute.textimager.uima.agreement.engine.relational;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Streams;
+import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import de.tudarmstadt.ukp.dkpro.core.api.semantics.type.WordSense;
@@ -74,12 +75,16 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
             int documentLength = JCasUtil.select(jCas, Token.class).size();
             CodingAnnotationStudy predicateIdentificationStudy = new CodingAnnotationStudy((int) viewCount);
 
-            CodingAnnotationStudy ttlabPredicateDisambiguationCodingStudy = new CodingAnnotationStudy((int) viewCount);
-            CodingAnnotationStudy propBankPredicateDisambiguationCodingStudy = new CodingAnnotationStudy((int) viewCount);
+            CodingAnnotationStudy perCasTTLabPredicateDisambiguationStudy = new CodingAnnotationStudy((int) viewCount);
+            CodingAnnotationStudy perCasPropBankPredicateDisambiguationStudy = new CodingAnnotationStudy((int) viewCount);
 
-            UnitizingAnnotationStudy perCasArgumentIdentificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
-            UnitizingAnnotationStudy perCasArgumentClassificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
-            UnitizingAnnotationStudy perCasArgumentClassificationMatchingSpansStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy perCasPropBankArgumentIdentificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy perCasPropBankArgumentClassificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy perCasPropBankArgumentClassificationMatchingSpansStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+
+            UnitizingAnnotationStudy perCasTTLabArgumentIdentificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy perCasTTLabArgumentClassificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy perCasTTLabArgumentClassificationMatchingSpansStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
 
             // Count all annotations for PARAM_MIN_ANNOTATIONS
             CountMap<String> perViewAnnotationCount = new CountMap<>();
@@ -109,28 +114,14 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
                 for (Integer tokenIndex : tokenIndices) {
                     /* Predicate Identification */
                     // Get the predicate annotations for the current token (by index), if present
-                    Entity[] predicateIdentificationAnnotations = perViewSRLContainers.values()
-                            .stream()
-                            .map(c -> c.getPredicateCoveringTokenByIndex(tokenIndex))
-                            .toArray(Entity[]::new);
-
-                    // Map the predicate annotations to binary "predicate-present/out" labels (P/O)
-                    Object[] predicateIdentificationAnnotationLabels = Arrays.stream(predicateIdentificationAnnotations)
-                            .map(e -> e == null ? "O" : "P")
-                            .toArray();
-                    predicateIdentificationStudy.addItemAsArray(
-                            predicateIdentificationAnnotationLabels
-                    );
+                    Entity[] predicateIdentificationAnnotations = runPredicateIdentification(predicateIdentificationStudy, perViewSRLContainers, tokenIndex);
 
                     /* Predicate Disambiguation */
                     // If all annotators agreed that the current token is a predicate,
                     // continue with the evaluation of the other tasks
-                    if (Arrays.stream(predicateIdentificationAnnotationLabels).allMatch(Predicate.isEqual("P"))) {
+                    if (Arrays.stream(predicateIdentificationAnnotations).map(e -> e == null ? "O" : "P").allMatch(Predicate.isEqual("P"))) {
                         // Get all SemanticSource annotations that cover the current predicate
-                        List<Collection<SemanticSource>> semanticSourcesCoveringCurrentPredicate = perViewSRLContainers.values()
-                                .stream()
-                                .map(c -> c.entitySemanticSourceLookup.get(c.getPredicateCoveringTokenByIndex(tokenIndex)))
-                                .collect(Collectors.toList());
+                        List<Collection<SemanticSource>> semanticSourcesCoveringCurrentPredicate = getSemanticSourcesCoveringCurrentPredicate(perViewSRLContainers, tokenIndex);
 
                         // If there is a view without any SemanticSources, skip this sample entirely
                         if (semanticSourcesCoveringCurrentPredicate.stream().anyMatch(Objects::isNull)) {
@@ -144,116 +135,56 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
                         // Create a mapping of the SemanticSource variant (TTLab or PropBank) to its respective annotation
                         // TODO: This currently discards multiple SemanticSource annotations of the same predicate, retaining only one.
                         // TODO: Check if multiple SemanticSource annotations are supposed to happen!
-                        List<Map<String, SemanticSource>> mappedSemanticSources = semanticSourcesCoveringCurrentPredicate.stream()
-                                .map(c -> c.stream().filter(semanticSource -> semanticSource.getSource() != null).collect(Collectors.toList()))
-                                .map(c -> c.stream().collect(Collectors.toMap(
-                                        SemanticSource::getSource,
-                                        Function.identity(),
-                                        (a, b) -> a))
-                                ).collect(Collectors.toList());
+                        List<Map<String, SemanticSource>> mappedSemanticSources = getMappedSemanticSources(semanticSourcesCoveringCurrentPredicate);
 
                         /// Predicate Disambiguation -- TTLab Verbset
                         // Get the SemanticSource annotations for the current predicate that use the TTLab synset
-                        SemanticSource[] ttlabDisambiguationAnnotations = mappedSemanticSources.stream()
-                                .map(map -> map.getOrDefault("ttlabsynset", null))
-                                .toArray(SemanticSource[]::new);
-
-                        // Add an item to the corresponding study, using the "value" field of the SemanticSource
-                        // annotation, if at least one annotation is not null
-                        if (Arrays.stream(ttlabDisambiguationAnnotations).anyMatch(Objects::nonNull)) {
-                            ttlabPredicateDisambiguationCodingStudy.addItemAsArray(
-                                    Arrays.stream(ttlabDisambiguationAnnotations)
-                                            .map(Optional::ofNullable)
-                                            .map(o -> o.map(WordSense::getValue).orElse(null))
-                                            .toArray()
-                            );
-                        }
+                        String[] ttlabDisambiguationAnnotationLabels = runPredicateDisambiguation(
+                                perCasTTLabPredicateDisambiguationStudy,
+                                mappedSemanticSources,
+                                "ttlabsynset"
+                        );
 
                         /// Predicate Disambiguation -- PropBank Verbset
-                        SemanticSource[] propbankDisambiguationAnnotations = mappedSemanticSources.stream()
-                                .map(map -> map.getOrDefault("propbank", null))
-                                .toArray(SemanticSource[]::new);
-
-                        // Store the sense labels (using the "value" field of the SemanticSource annotation) in an array
-                        // for the Argument Identification & Classification tasks
-                        String[] propbankDisambiguationAnnotationLabels = Arrays.stream(propbankDisambiguationAnnotations)
-                                .map(Optional::ofNullable)
-                                .map(o -> o.map(WordSense::getValue).orElse(null))
-                                .toArray(String[]::new);
-
-                        // Add an item to the corresponding study if at least one annotation is not null
-                        if (Arrays.stream(propbankDisambiguationAnnotations).anyMatch(Objects::nonNull)) {
-                            propBankPredicateDisambiguationCodingStudy.addItemAsArray(
-                                    propbankDisambiguationAnnotationLabels
-                            );
-                        }
+                        String[] propbankDisambiguationAnnotationLabels = runPredicateDisambiguation(
+                                perCasPropBankPredicateDisambiguationStudy,
+                                mappedSemanticSources,
+                                "propbank"
+                        );
 
                         /* Argument Identification & Classification */
                         // Check if all sense labels for the current predicate match
                         // TODO: Check if this is necessary.
+
+                        /// Argument Identification & Classification -- TTLab Verset
+                        if (Arrays.stream(ttlabDisambiguationAnnotationLabels).allMatch(Predicate.isEqual(ttlabDisambiguationAnnotationLabels[0]))) {
+                            runArgumentIdentificationClassification(
+                                    perCasTTLabArgumentIdentificationStudy,
+                                    perCasTTLabArgumentClassificationStudy,
+                                    perCasTTLabArgumentClassificationMatchingSpansStudy,
+                                    perViewSRLContainers,
+                                    predicateIdentificationAnnotations
+                            );
+                        }
+
+                        /// Argument Identification & Classification -- PropBank Verset
                         if (Arrays.stream(propbankDisambiguationAnnotationLabels).allMatch(Predicate.isEqual(propbankDisambiguationAnnotationLabels[0]))) {
-                            HashMap<ImmutablePair<Integer, Integer>, HashMap<Integer, String>> argumentDisambiguationSpans = new HashMap<>();
-                            for (int raterIndex = 0; raterIndex < annotatorIndex.size(); raterIndex++) {
-                                Entity predicate = predicateIdentificationAnnotations[raterIndex];
-                                AnnotationContainer annotationContainer = perViewSRLContainers.get(raterIndex);
-                                HashMap<Entity, String> argumentsOfPredicate = annotationContainer.predicateArgumentLookup.get(predicate);
-                                for (Map.Entry<Entity, String> argumentAndLabel : argumentsOfPredicate.entrySet()) {
-                                    Entity argument = argumentAndLabel.getKey();
-
-                                    /// Argument Identification
-                                    createAnnotation(
-                                            perCasArgumentIdentificationStudy,
-                                            raterIndex,
-                                            annotationContainer.argumentTokenLookup.get(argument),
-                                            annotationContainer.tokenIndexingMap,
-                                            "ARG"
-                                    );
-
-                                    /// Argument Disambiguation
-                                    String label = argumentAndLabel.getValue();
-                                    ImmutablePair<Integer, Integer> beginLengthPair = createAnnotation(
-                                            perCasArgumentClassificationStudy,
-                                            raterIndex,
-                                            annotationContainer.argumentTokenLookup.get(argument),
-                                            annotationContainer.tokenIndexingMap,
-                                            label
-                                    );
-
-                                    if (beginLengthPair != null) {
-                                        HashMap<Integer, String> annotatorLabelMap = argumentDisambiguationSpans.getOrDefault(beginLengthPair, new HashMap<>());
-                                        annotatorLabelMap.put(raterIndex, label);
-                                        argumentDisambiguationSpans.put(beginLengthPair, annotatorLabelMap);
-                                    }
-                                }
-                            }
-                            argumentDisambiguationSpans.forEach((span, annotatorMap) -> {
-                                if (annotatorMap.size() == annotatorIndex.size()) {
-                                    // All annotators agree about this span
-                                    annotatorMap.forEach((raterIndex, label) -> {
-                                        perCasArgumentClassificationMatchingSpansStudy.addUnit(
-                                                span.getLeft(),
-                                                span.getRight(),
-                                                raterIndex,
-                                                label
-                                        );
-                                    });
-                                }
-                            });
+                            runArgumentIdentificationClassification(
+                                    perCasPropBankArgumentIdentificationStudy,
+                                    perCasPropBankArgumentClassificationStudy,
+                                    perCasPropBankArgumentClassificationMatchingSpansStudy,
+                                    perViewSRLContainers,
+                                    predicateIdentificationAnnotations
+                            );
                         }
                     }
                 }
             }
-            long predicateIdentificationPositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).anyMatch(Predicate.isEqual("P"))).count();
-            long predicateIdentificationDoublePositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).allMatch(Predicate.isEqual("P"))).count();
-            System.out.printf("Predicate Identification Agreement: %f, %d items, %d double positive\n", new KrippendorffAlphaAgreement(predicateIdentificationStudy, new NominalDistanceFunction()).calculateAgreement(), predicateIdentificationPositiveSamples, predicateIdentificationDoublePositiveSamples);
-            System.out.println("Predicate Disambiguation Agreement");
-            System.out.printf("  TTLab:    %f, %d items\n", new KrippendorffAlphaAgreement(ttlabPredicateDisambiguationCodingStudy, new NominalDistanceFunction()).calculateAgreement(), ttlabPredicateDisambiguationCodingStudy.getItemCount());
-            System.out.printf("  PropBank: %f, %d items\n", new KrippendorffAlphaAgreement(propBankPredicateDisambiguationCodingStudy, new NominalDistanceFunction()).calculateAgreement(), propBankPredicateDisambiguationCodingStudy.getItemCount());
-            System.out.printf("Argument Identification Agreement: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasArgumentIdentificationStudy).calculateAgreement(), perCasArgumentIdentificationStudy.getUnitCount());
-            System.out.println("Argument Classification Agreement");
-            System.out.printf("  All Spans: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasArgumentClassificationStudy).calculateAgreement(), perCasArgumentClassificationStudy.getUnitCount());
-            System.out.printf("  Matching Spans: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasArgumentClassificationMatchingSpansStudy.getUnitCount());
-            System.out.flush();
+
+            if (pPrintStatistics) {
+                System.out.printf("%s\n", StringUtils.appendIfMissing(DocumentMetaData.get(jCas).getDocumentId(), ".xmi"));
+                printStatistics(predicateIdentificationStudy, perCasTTLabPredicateDisambiguationStudy, perCasPropBankPredicateDisambiguationStudy, perCasPropBankArgumentIdentificationStudy, perCasPropBankArgumentClassificationStudy, perCasPropBankArgumentClassificationMatchingSpansStudy, perCasTTLabArgumentClassificationStudy, perCasTTLabArgumentClassificationMatchingSpansStudy);
+            }
 
             documentOffset.getAndAdd(documentLength);
 
@@ -266,6 +197,137 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
         } catch (CASException e) {
             e.printStackTrace();
         }
+    }
+
+    private void printStatistics(CodingAnnotationStudy predicateIdentificationStudy, CodingAnnotationStudy perCasTTLabPredicateDisambiguationStudy, CodingAnnotationStudy perCasPropBankPredicateDisambiguationStudy, UnitizingAnnotationStudy perCasPropBankArgumentIdentificationStudy, UnitizingAnnotationStudy perCasPropBankArgumentClassificationStudy, UnitizingAnnotationStudy perCasPropBankArgumentClassificationMatchingSpansStudy, UnitizingAnnotationStudy perCasTTLabArgumentClassificationStudy, UnitizingAnnotationStudy perCasTTLabArgumentClassificationMatchingSpansStudy) {
+        long predicateIdentificationPositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).anyMatch(Predicate.isEqual("P"))).count();
+        long predicateIdentificationDoublePositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).allMatch(Predicate.isEqual("P"))).count();
+        System.out.printf("Predicate Identification Agreement: %f, %d items, %d double positive\n", new KrippendorffAlphaAgreement(predicateIdentificationStudy, new NominalDistanceFunction()).calculateAgreement(), predicateIdentificationPositiveSamples, predicateIdentificationDoublePositiveSamples);
+        System.out.println("Predicate Disambiguation Agreement");
+        System.out.printf("  TTLab:    %f, %d items\n", new KrippendorffAlphaAgreement(perCasTTLabPredicateDisambiguationStudy, new NominalDistanceFunction()).calculateAgreement(), perCasTTLabPredicateDisambiguationStudy.getItemCount());
+        System.out.printf("  PropBank: %f, %d items\n", new KrippendorffAlphaAgreement(perCasPropBankPredicateDisambiguationStudy, new NominalDistanceFunction()).calculateAgreement(), perCasPropBankPredicateDisambiguationStudy.getItemCount());
+        System.out.printf("Argument Identification Agreement: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentIdentificationStudy).calculateAgreement(), perCasPropBankArgumentIdentificationStudy.getUnitCount());
+        System.out.println("Argument Classification Agreement (PropBank)");
+        System.out.printf("  All Spans:      %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentClassificationStudy).calculateAgreement(), perCasPropBankArgumentClassificationStudy.getUnitCount());
+        System.out.printf("  Matching Spans: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasPropBankArgumentClassificationMatchingSpansStudy.getUnitCount());
+        System.out.println("Argument Classification Agreement (TTLab)");
+        System.out.printf("  All Spans:      %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentClassificationStudy).calculateAgreement(), perCasTTLabArgumentClassificationStudy.getUnitCount());
+        System.out.printf("  Matching Spans: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasTTLabArgumentClassificationMatchingSpansStudy.getUnitCount());
+        System.out.flush();
+    }
+
+    private Entity[] runPredicateIdentification(CodingAnnotationStudy predicateIdentificationStudy, HashMap<Integer, AnnotationContainer> perViewSRLContainers, Integer tokenIndex) {
+        Entity[] predicateIdentificationAnnotations = perViewSRLContainers.values()
+                .stream()
+                .map(c -> c.getPredicateCoveringTokenByIndex(tokenIndex))
+                .toArray(Entity[]::new);
+
+        // Map the predicate annotations to binary "predicate-present/out" labels (P/O)
+        Object[] predicateIdentificationAnnotationLabels = Arrays.stream(predicateIdentificationAnnotations)
+                .map(e -> e == null ? "O" : "P")
+                .toArray();
+        predicateIdentificationStudy.addItemAsArray(
+                predicateIdentificationAnnotationLabels
+        );
+        return predicateIdentificationAnnotations;
+    }
+
+    private List<Collection<SemanticSource>> getSemanticSourcesCoveringCurrentPredicate(HashMap<Integer, AnnotationContainer> perViewSRLContainers, Integer tokenIndex) {
+        return perViewSRLContainers.values()
+                .stream()
+                .map(c -> c.entitySemanticSourceLookup.get(c.getPredicateCoveringTokenByIndex(tokenIndex)))
+                .collect(Collectors.toList());
+    }
+
+    private List<Map<String, SemanticSource>> getMappedSemanticSources(List<Collection<SemanticSource>> semanticSourcesCoveringCurrentPredicate) {
+        return semanticSourcesCoveringCurrentPredicate.stream()
+                .map(c -> c.stream().filter(semanticSource -> semanticSource.getSource() != null).collect(Collectors.toList()))
+                .map(c -> c.stream().collect(Collectors.toMap(
+                        SemanticSource::getSource,
+                        Function.identity(),
+                        (a, b) -> a))
+                ).collect(Collectors.toList());
+    }
+
+    private String[] runPredicateDisambiguation(
+            final CodingAnnotationStudy perCasPredicateDisambiguationStudy,
+            final List<Map<String, SemanticSource>> mappedSemanticSources,
+            final String versetIdentifier
+    ) {
+        SemanticSource[] propbankDisambiguationAnnotations = mappedSemanticSources.stream()
+                .map(map -> map.getOrDefault(versetIdentifier, null))
+                .toArray(SemanticSource[]::new);
+
+        // Store the sense labels (using the "value" field of the SemanticSource annotation) in an array
+        // for the Argument Identification & Classification tasks
+        String[] propbankDisambiguationAnnotationLabels = Arrays.stream(propbankDisambiguationAnnotations)
+                .map(Optional::ofNullable)
+                .map(o -> o.map(WordSense::getValue).orElse(null))
+                .toArray(String[]::new);
+
+        // Add an item to the corresponding study if at least one annotation is not null
+        if (Arrays.stream(propbankDisambiguationAnnotationLabels).anyMatch(Objects::nonNull)) {
+            perCasPredicateDisambiguationStudy.addItemAsArray(
+                    propbankDisambiguationAnnotationLabels
+            );
+        }
+        return propbankDisambiguationAnnotationLabels;
+    }
+
+    private void runArgumentIdentificationClassification(
+            final UnitizingAnnotationStudy perCasArgumentIdentificationStudy,
+            final UnitizingAnnotationStudy perCasArgumentClassificationStudy,
+            final UnitizingAnnotationStudy perCasArgumentClassificationMatchingSpansStudy,
+            final HashMap<Integer, AnnotationContainer> perViewSRLContainers,
+            final Entity[] predicateIdentificationAnnotations
+    ) {
+        HashMap<ImmutablePair<Integer, Integer>, HashMap<Integer, String>> argumentDisambiguationSpans = new HashMap<>();
+        for (int raterIndex = 0; raterIndex < annotatorIndex.size(); raterIndex++) {
+            Entity predicate = predicateIdentificationAnnotations[raterIndex];
+            AnnotationContainer annotationContainer = perViewSRLContainers.get(raterIndex);
+            HashMap<Entity, String> argumentsOfPredicate = annotationContainer.predicateArgumentLookup.get(predicate);
+            for (Map.Entry<Entity, String> argumentAndLabel : argumentsOfPredicate.entrySet()) {
+                Entity argument = argumentAndLabel.getKey();
+
+                /// Argument Identification
+                createAnnotation(
+                        perCasArgumentIdentificationStudy,
+                        raterIndex,
+                        annotationContainer.argumentTokenLookup.get(argument),
+                        annotationContainer.tokenIndexingMap,
+                        "ARG"
+                );
+
+                /// Argument Disambiguation
+                String label = argumentAndLabel.getValue();
+                ImmutablePair<Integer, Integer> beginLengthPair = createAnnotation(
+                        perCasArgumentClassificationStudy,
+                        raterIndex,
+                        annotationContainer.argumentTokenLookup.get(argument),
+                        annotationContainer.tokenIndexingMap,
+                        label
+                );
+
+                if (beginLengthPair != null) {
+                    HashMap<Integer, String> annotatorLabelMap = argumentDisambiguationSpans.getOrDefault(beginLengthPair, new HashMap<>());
+                    annotatorLabelMap.put(raterIndex, label);
+                    argumentDisambiguationSpans.put(beginLengthPair, annotatorLabelMap);
+                }
+            }
+        }
+        argumentDisambiguationSpans.forEach((span, annotatorMap) -> {
+            if (annotatorMap.size() == annotatorIndex.size()) {
+                // All annotators agree about this span
+                annotatorMap.forEach((raterIndex, label) -> {
+                    perCasArgumentClassificationMatchingSpansStudy.addUnit(
+                            span.getLeft(),
+                            span.getRight(),
+                            raterIndex,
+                            label
+                    );
+                });
+            }
+        });
     }
 
     public static <T extends Annotation> IndexingMap<T> getIndexingMap(JCas someCas, Class<T> type) {
