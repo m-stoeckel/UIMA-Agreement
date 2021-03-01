@@ -21,10 +21,8 @@ import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.resource.ResourceInitializationException;
 import org.dkpro.statistics.agreement.IAnnotationUnit;
 import org.dkpro.statistics.agreement.coding.CodingAnnotationStudy;
-import org.dkpro.statistics.agreement.coding.ICodingAnnotationItem;
 import org.dkpro.statistics.agreement.coding.KrippendorffAlphaAgreement;
 import org.dkpro.statistics.agreement.distance.NominalDistanceFunction;
-import org.dkpro.statistics.agreement.unitizing.IUnitizingAnnotationUnit;
 import org.dkpro.statistics.agreement.unitizing.KrippendorffAlphaUnitizingAgreement;
 import org.dkpro.statistics.agreement.unitizing.UnitizingAnnotationStudy;
 import org.hucompute.textimager.uima.agreement.engine.AbstractIAAEngine;
@@ -36,7 +34,7 @@ import org.texttechnologylab.annotation.semaf.isobase.Link;
 import org.texttechnologylab.annotation.semaf.isobase.Signal;
 import org.texttechnologylab.annotation.semaf.semafsr.SrLink;
 import org.texttechnologylab.annotation.type.Fingerprint;
-import org.texttechnologylab.utilities.collections.CountMap;
+import org.texttechnologylab.iaa.AgreementValue;
 import org.texttechnologylab.utilities.collections.IndexingMap;
 
 import javax.annotation.Nonnull;
@@ -49,7 +47,8 @@ import java.util.stream.Collectors;
 
 @Parameters(
         exclude = {
-                AbstractIAAEngine.PARAM_ANNOTATION_CLASSES
+                AbstractIAAEngine.PARAM_ANNOTATION_CLASSES,
+                AbstractIAAEngine.PARAM_MIN_ANNOTATIONS // FIXME: Currently not implemented
         }
 )
 public class RelationAnnotationAgreement extends AbstractIAAEngine {
@@ -66,10 +65,6 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
 
     private TreeSet<String> categories = new TreeSet<>();
     private AtomicInteger documentOffset = new AtomicInteger(0);
-    private ArrayList<ImmutablePair<Integer, Iterable<ICodingAnnotationItem>>> predicateIdenficitationStudies = new ArrayList<>();
-    private ArrayList<ImmutablePair<Integer, Iterable<ICodingAnnotationItem>>> predicateDisambiguationStudies = new ArrayList<>();
-    private ArrayList<ImmutablePair<Integer, Iterable<IUnitizingAnnotationUnit>>> argumentIdenficitationStudies = new ArrayList<>();
-    private ArrayList<ImmutablePair<Integer, Iterable<IUnitizingAnnotationUnit>>> argumentClassificationStudies = new ArrayList<>();
     private IndexingMap<String> annotatorIndex = new IndexingMap<>();
 
     @Override
@@ -87,19 +82,16 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
             int documentLength = JCasUtil.select(jCas, Token.class).size();
             CodingAnnotationStudy predicateIdentificationStudy = new CodingAnnotationStudy((int) viewCount);
 
-            CodingAnnotationStudy perCasTTLabPredicateDisambiguationStudy = new CodingAnnotationStudy((int) viewCount);
-            CodingAnnotationStudy perCasPropBankPredicateDisambiguationStudy = new CodingAnnotationStudy((int) viewCount);
+            CodingAnnotationStudy predicateDisambiguationStudyTTLab = new CodingAnnotationStudy((int) viewCount);
+            CodingAnnotationStudy predicateDisambiguationStudyPropBank = new CodingAnnotationStudy((int) viewCount);
 
-            UnitizingAnnotationStudy perCasPropBankArgumentIdentificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
-            UnitizingAnnotationStudy perCasPropBankArgumentClassificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
-            UnitizingAnnotationStudy perCasPropBankArgumentClassificationMatchingSpansStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy argumentIdentificationStudyPropBank = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy argumentClassificationStudyPropBank = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy argumentClassificationMatchingSpansStudyPropBank = new UnitizingAnnotationStudy((int) viewCount, documentLength);
 
-            UnitizingAnnotationStudy perCasTTLabArgumentIdentificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
-            UnitizingAnnotationStudy perCasTTLabArgumentClassificationStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
-            UnitizingAnnotationStudy perCasTTLabArgumentClassificationMatchingSpansStudy = new UnitizingAnnotationStudy((int) viewCount, documentLength);
-
-            // Count all annotations for PARAM_MIN_ANNOTATIONS
-            CountMap<String> perViewAnnotationCount = new CountMap<>();
+            UnitizingAnnotationStudy argumentIdentificationStudyTTLab = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy argumentClassificationStudyTTLab = new UnitizingAnnotationStudy((int) viewCount, documentLength);
+            UnitizingAnnotationStudy argumentClassificationMatchingSpansStudyTTLab = new UnitizingAnnotationStudy((int) viewCount, documentLength);
 
             HashMap<Integer, AnnotationContainer> perViewSRLContainers = new HashMap<>();
 
@@ -152,14 +144,14 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
                         /// Predicate Disambiguation -- TTLab Verbset
                         // Get the SemanticSource annotations for the current predicate that use the TTLab synset
                         String[] ttlabDisambiguationAnnotationLabels = runPredicateDisambiguation(
-                                perCasTTLabPredicateDisambiguationStudy,
+                                predicateDisambiguationStudyTTLab,
                                 mappedSemanticSources,
                                 "ttlabsynset"
                         );
 
                         /// Predicate Disambiguation -- PropBank Verbset
                         String[] propbankDisambiguationAnnotationLabels = runPredicateDisambiguation(
-                                perCasPropBankPredicateDisambiguationStudy,
+                                predicateDisambiguationStudyPropBank,
                                 mappedSemanticSources,
                                 "propbank"
                         );
@@ -168,23 +160,23 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
                         // Check if all sense labels for the current predicate match
                         // TODO: Check if this is necessary.
 
-                        /// Argument Identification & Classification -- TTLab Verset
+                        /// Argument Identification & Classification -- TTLab Verbset
                         if (Arrays.stream(ttlabDisambiguationAnnotationLabels).allMatch(Predicate.isEqual(ttlabDisambiguationAnnotationLabels[0]))) {
                             runArgumentIdentificationClassification(
-                                    perCasTTLabArgumentIdentificationStudy,
-                                    perCasTTLabArgumentClassificationStudy,
-                                    perCasTTLabArgumentClassificationMatchingSpansStudy,
+                                    argumentIdentificationStudyTTLab,
+                                    argumentClassificationStudyTTLab,
+                                    argumentClassificationMatchingSpansStudyTTLab,
                                     perViewSRLContainers,
                                     predicateIdentificationAnnotations
                             );
                         }
 
-                        /// Argument Identification & Classification -- PropBank Verset
+                        /// Argument Identification & Classification -- PropBank Verbset
                         if (Arrays.stream(propbankDisambiguationAnnotationLabels).allMatch(Predicate.isEqual(propbankDisambiguationAnnotationLabels[0]))) {
                             runArgumentIdentificationClassification(
-                                    perCasPropBankArgumentIdentificationStudy,
-                                    perCasPropBankArgumentClassificationStudy,
-                                    perCasPropBankArgumentClassificationMatchingSpansStudy,
+                                    argumentIdentificationStudyPropBank,
+                                    argumentClassificationStudyPropBank,
+                                    argumentClassificationMatchingSpansStudyPropBank,
                                     perViewSRLContainers,
                                     predicateIdentificationAnnotations
                             );
@@ -193,27 +185,23 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
                 }
             }
 
-            if (pPrintStatistics) {
-                System.out.printf("%s,%s filtering 'Processed' samples\n", StringUtils.appendIfMissing(DocumentMetaData.get(jCas).getDocumentId(), ".xmi"), pFilterProcessed ? "" : " not");
-                printStatistics(
-                        predicateIdentificationStudy,
-                        perCasTTLabPredicateDisambiguationStudy,
-                        perCasPropBankPredicateDisambiguationStudy,
-                        perCasPropBankArgumentIdentificationStudy,
-                        perCasPropBankArgumentClassificationStudy,
-                        perCasPropBankArgumentClassificationMatchingSpansStudy,
-                        perCasTTLabArgumentIdentificationStudy,
-                        perCasTTLabArgumentClassificationStudy,
-                        perCasTTLabArgumentClassificationMatchingSpansStudy
-                );
-            }
-
             documentOffset.getAndAdd(documentLength);
 
             switch (pMultiCasHandling) {
                 case SEPARATE:
                 case BOTH:
-//                    handleSeparate(jCas, perCasStudy);
+                    handleSeparate(
+                            jCas,
+                            predicateIdentificationStudy,
+                            predicateDisambiguationStudyTTLab,
+                            predicateDisambiguationStudyPropBank,
+                            argumentIdentificationStudyPropBank,
+                            argumentClassificationStudyPropBank,
+                            argumentClassificationMatchingSpansStudyPropBank,
+                            argumentIdentificationStudyTTLab,
+                            argumentClassificationStudyTTLab,
+                            argumentClassificationMatchingSpansStudyTTLab
+                    );
                     break;
             }
         } catch (CASException e) {
@@ -221,34 +209,121 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
         }
     }
 
-    private void printStatistics(
+    private void handleSeparate(
+            JCas jCas,
             CodingAnnotationStudy predicateIdentificationStudy,
-            CodingAnnotationStudy perCasTTLabPredicateDisambiguationStudy,
-            CodingAnnotationStudy perCasPropBankPredicateDisambiguationStudy,
-            UnitizingAnnotationStudy perCasPropBankArgumentIdentificationStudy,
-            UnitizingAnnotationStudy perCasPropBankArgumentClassificationStudy,
-            UnitizingAnnotationStudy perCasPropBankArgumentClassificationMatchingSpansStudy,
-            UnitizingAnnotationStudy perCasTTLabArgumentIdentificationStudy,
-            UnitizingAnnotationStudy perCasTTLabArgumentClassificationStudy,
-            UnitizingAnnotationStudy perCasTTLabArgumentClassificationMatchingSpansStudy
+            CodingAnnotationStudy predicateDisambiguationStudyTTLab,
+            CodingAnnotationStudy predicateDisambiguationStudyPropBank,
+            UnitizingAnnotationStudy argumentIdentificationStudyPropBank,
+            UnitizingAnnotationStudy argumentClassificationStudyPropBank,
+            UnitizingAnnotationStudy argumentClassificationMatchingSpansStudyPropBank,
+            UnitizingAnnotationStudy argumentIdentificationStudyTTLab,
+            UnitizingAnnotationStudy argumentClassificationStudyTTLab,
+            UnitizingAnnotationStudy argumentClassificationMatchingSpansStudyTTLab
     ) {
-        long predicateIdentificationPositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).anyMatch(Predicate.isEqual("P"))).count();
-        long predicateIdentificationDoublePositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).allMatch(Predicate.isEqual("P"))).count();
-        System.out.println("Predicate Identification                 && \\\\");
-        System.out.printf("$\\quad$ All                              & %01.6f & %d items, %d double positive \\\\\n", new KrippendorffAlphaAgreement(predicateIdentificationStudy, new NominalDistanceFunction()).calculateAgreement(), predicateIdentificationPositiveSamples, predicateIdentificationDoublePositiveSamples);
-        System.out.println("Predicate Disambiguation                 && \\\\");
-        System.out.printf("$\\quad$ TTLab                            & %01.6f & %d items \\\\\n", new KrippendorffAlphaAgreement(perCasTTLabPredicateDisambiguationStudy, new NominalDistanceFunction()).calculateAgreement(), perCasTTLabPredicateDisambiguationStudy.getItemCount());
-        System.out.printf("$\\quad$ PropBank                         & %01.6f & %d items \\\\\n", new KrippendorffAlphaAgreement(perCasPropBankPredicateDisambiguationStudy, new NominalDistanceFunction()).calculateAgreement(), perCasPropBankPredicateDisambiguationStudy.getItemCount());
-        System.out.println("Argument Identification                  && \\\\");
-        System.out.printf("$\\quad$ TTLab                            & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentIdentificationStudy).calculateAgreement(), perCasPropBankArgumentIdentificationStudy.getUnitCount());
-        System.out.printf("$\\quad$ PropBank                         & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentIdentificationStudy).calculateAgreement(), perCasPropBankArgumentIdentificationStudy.getUnitCount());
-        System.out.println("Argument Classification (All)            && \\\\");
-        System.out.printf("$\\quad$ TTLab                            & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentClassificationStudy).calculateAgreement(), perCasTTLabArgumentClassificationStudy.getUnitCount());
-        System.out.printf("$\\quad$ PropBank                         & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentClassificationStudy).calculateAgreement(), perCasPropBankArgumentClassificationStudy.getUnitCount());
-        System.out.println("Argument Classification (Matching Spans) && \\\\");
-        System.out.printf("$\\quad$ TTLab                            & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasTTLabArgumentClassificationMatchingSpansStudy.getUnitCount());
-        System.out.printf("$\\quad$ PropBank                         & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasPropBankArgumentClassificationMatchingSpansStudy.getUnitCount());
-        System.out.flush();
+        if (pAnnotateDocument || pPrintStatistics) {
+            long predicateIdentificationPositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).anyMatch(Predicate.isEqual("P"))).count();
+            long predicateIdentificationDoublePositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).allMatch(Predicate.isEqual("P"))).count();
+            double predicateIdentificationAgreementValue = calculateCodingAgreement(predicateIdentificationStudy);
+
+            double predicateDisambiguationStudyTTLabAgreementValue = calculateCodingAgreement(predicateDisambiguationStudyTTLab);
+            double predicateDisambiguationStudyPropBankAgreementValue = calculateCodingAgreement(predicateDisambiguationStudyPropBank);
+
+            double argumentIdentificationStudyTTLabAgreementValue = calculateUnitzingAgreement(argumentIdentificationStudyTTLab);
+            double argumentIdentificationStudyPropBankAgreementValue = calculateUnitzingAgreement(argumentIdentificationStudyPropBank);
+
+            double argumentClassificationStudyTTLabAgreementValue = calculateUnitzingAgreement(argumentClassificationStudyTTLab);
+            double argumentClassificationStudyPropBankAgreementValue = calculateUnitzingAgreement(argumentClassificationStudyPropBank);
+
+            double argumentClassificationMatchingSpansStudyTTLabAgreementValue = calculateUnitzingAgreement(argumentClassificationMatchingSpansStudyTTLab);
+            double argumentClassificationMatchingSpansStudyPropBankAgreementValue = calculateUnitzingAgreement(argumentClassificationMatchingSpansStudyPropBank);
+
+            if (pAnnotateDocument) {
+                JCas viewIAA = initializeIaaView(jCas);
+                AgreementValue agreementValue;
+
+                agreementValue = new AgreementValue(viewIAA);
+                agreementValue.setAgreementLabel("Predicate Identification");
+                agreementValue.setAgreementValue(predicateIdentificationAgreementValue);
+                agreementValue.setAgreementUnits((int) predicateIdentificationPositiveSamples);
+                viewIAA.addFsToIndexes(agreementValue);
+
+                agreementValue = new AgreementValue(viewIAA);
+                agreementValue.setAgreementLabel("Predicate Disambiguation - TTLab");
+                agreementValue.setAgreementValue(predicateDisambiguationStudyTTLabAgreementValue);
+                agreementValue.setAgreementUnits(predicateDisambiguationStudyTTLab.getItemCount());
+                viewIAA.addFsToIndexes(agreementValue);
+
+                agreementValue = new AgreementValue(viewIAA);
+                agreementValue.setAgreementLabel("Predicate Disambiguation - PropBank");
+                agreementValue.setAgreementValue(predicateDisambiguationStudyPropBankAgreementValue);
+                agreementValue.setAgreementUnits(predicateDisambiguationStudyPropBank.getItemCount());
+                viewIAA.addFsToIndexes(agreementValue);
+
+                agreementValue = new AgreementValue(viewIAA);
+                agreementValue.setAgreementLabel("Argument Identification - TTLab");
+                agreementValue.setAgreementValue(argumentIdentificationStudyTTLabAgreementValue);
+                agreementValue.setAgreementUnits(argumentIdentificationStudyTTLab.getUnitCount());
+                viewIAA.addFsToIndexes(agreementValue);
+
+                agreementValue = new AgreementValue(viewIAA);
+                agreementValue.setAgreementLabel("Argument Identification - PropBank");
+                agreementValue.setAgreementValue(argumentIdentificationStudyPropBankAgreementValue);
+                agreementValue.setAgreementUnits(argumentIdentificationStudyPropBank.getUnitCount());
+                viewIAA.addFsToIndexes(agreementValue);
+
+                agreementValue = new AgreementValue(viewIAA);
+                agreementValue.setAgreementLabel("Argument Classification (All Spans) - TTLab");
+                agreementValue.setAgreementValue(argumentClassificationStudyTTLabAgreementValue);
+                agreementValue.setAgreementUnits(argumentClassificationStudyTTLab.getUnitCount());
+                viewIAA.addFsToIndexes(agreementValue);
+
+                agreementValue = new AgreementValue(viewIAA);
+                agreementValue.setAgreementLabel("Argument Classification (All Spans) - PropBank");
+                agreementValue.setAgreementValue(argumentClassificationStudyPropBankAgreementValue);
+                agreementValue.setAgreementUnits(argumentClassificationStudyPropBank.getUnitCount());
+                viewIAA.addFsToIndexes(agreementValue);
+
+                agreementValue = new AgreementValue(viewIAA);
+                agreementValue.setAgreementLabel("Argument Classification (Matching Spans) - TTLab");
+                agreementValue.setAgreementValue(argumentClassificationMatchingSpansStudyTTLabAgreementValue);
+                agreementValue.setAgreementUnits(argumentClassificationMatchingSpansStudyTTLab.getUnitCount());
+                viewIAA.addFsToIndexes(agreementValue);
+
+                agreementValue = new AgreementValue(viewIAA);
+                agreementValue.setAgreementLabel("Argument Classification (Matching Spans) - PropBank");
+                agreementValue.setAgreementValue(argumentClassificationMatchingSpansStudyPropBankAgreementValue);
+                agreementValue.setAgreementUnits(argumentClassificationMatchingSpansStudyPropBank.getUnitCount());
+                viewIAA.addFsToIndexes(agreementValue);
+            }
+
+            if (pPrintStatistics) {
+                System.out.printf("%s,%s filtering 'Processed' samples\n", StringUtils.appendIfMissing(DocumentMetaData.get(jCas).getDocumentId(), ".xmi"), pFilterProcessed ? "" : " not");
+                System.out.println("Predicate Identification                 && \\\\");
+                System.out.printf("$\\quad$ All                              & %01.6f & %d items, %d double positive \\\\\n", predicateIdentificationAgreementValue, predicateIdentificationPositiveSamples, predicateIdentificationDoublePositiveSamples);
+                System.out.println("Predicate Disambiguation                 && \\\\");
+                System.out.printf("$\\quad$ TTLab                            & %01.6f & %d items \\\\\n", predicateDisambiguationStudyTTLabAgreementValue, predicateDisambiguationStudyTTLab.getItemCount());
+                System.out.printf("$\\quad$ PropBank                         & %01.6f & %d items \\\\\n", predicateDisambiguationStudyPropBankAgreementValue, predicateDisambiguationStudyPropBank.getItemCount());
+                System.out.println("Argument Identification                  && \\\\");
+                System.out.printf("$\\quad$ TTLab                            & %01.6f & %d units \\\\\n", argumentIdentificationStudyTTLabAgreementValue, argumentIdentificationStudyTTLab.getUnitCount());
+                System.out.printf("$\\quad$ PropBank                         & %01.6f & %d units \\\\\n", argumentIdentificationStudyPropBankAgreementValue, argumentIdentificationStudyPropBank.getUnitCount());
+                System.out.println("Argument Classification (All)            && \\\\");
+                System.out.printf("$\\quad$ TTLab                            & %01.6f & %d units \\\\\n", argumentClassificationStudyTTLabAgreementValue, argumentClassificationStudyTTLab.getUnitCount());
+                System.out.printf("$\\quad$ PropBank                         & %01.6f & %d units \\\\\n", argumentClassificationStudyPropBankAgreementValue, argumentClassificationStudyPropBank.getUnitCount());
+                System.out.println("Argument Classification (Matching Spans) && \\\\");
+                System.out.printf("$\\quad$ TTLab                            & %01.6f & %d units \\\\\n", argumentClassificationMatchingSpansStudyTTLabAgreementValue, argumentClassificationMatchingSpansStudyTTLab.getUnitCount());
+                System.out.printf("$\\quad$ PropBank                         & %01.6f & %d units \\\\\n", argumentClassificationMatchingSpansStudyPropBankAgreementValue, argumentClassificationMatchingSpansStudyPropBank.getUnitCount());
+                System.out.flush();
+            }
+        }
+    }
+
+    private double calculateCodingAgreement(CodingAnnotationStudy predicateDisambiguationStudyTTLab) {
+        return new KrippendorffAlphaAgreement(predicateDisambiguationStudyTTLab, new NominalDistanceFunction()).calculateAgreement();
+    }
+
+    private double calculateUnitzingAgreement(UnitizingAnnotationStudy argumentIdentificationStudyTTLab) {
+        return new KrippendorffAlphaUnitizingAgreement(argumentIdentificationStudyTTLab).calculateAgreement();
     }
 
     private Entity[] runPredicateIdentification(CodingAnnotationStudy predicateIdentificationStudy, HashMap<Integer, AnnotationContainer> perViewSRLContainers, Integer tokenIndex) {
@@ -381,15 +456,15 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
     }
 
     /**
-     * Create an annotation in the given unitizing study for the given annotator.
-     * This method will establish the span of the annotation by finding min/max of begin/end of the tokens in the
-     * 'containedTokens' collection.
-     *  @param unitizingAnnotationStudy The study to add the unit to.
-     * @param raterIdx The rater index of the annotation.
-     * @param containedTokens The tokens contained within / covered by the annotation in question.
-     * @param tokenIndexingMap An {@link IndexingMap IndexingMap<Token>} that will be used to determine min/max of the
-*                        start and end indices of the contained tokens.
-     * @param category The category label of the unit.
+     * Create an annotation in the given unitizing study for the given annotator. This method will establish the span of
+     * the annotation by finding min/max of begin/end of the tokens in the 'containedTokens' collection.
+     *
+     * @param unitizingAnnotationStudy The study to add the unit to.
+     * @param raterIdx                 The rater index of the annotation.
+     * @param containedTokens          The tokens contained within / covered by the annotation in question.
+     * @param tokenIndexingMap         An {@link IndexingMap IndexingMap<Token>} that will be used to determine min/max
+     *                                 of the start and end indices of the contained tokens.
+     * @param category                 The category label of the unit.
      * @return
      */
     private ImmutablePair<Integer, Integer> createAnnotation(
@@ -550,13 +625,13 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
     /**
      * Generic method to reverse a {@link Map Map{K, Collection{V}}}. The returned map will contain a <b>flat</b>
      * mapping of the values in the inner collections to their corresponding keys.
-     *
+     * <p>
      * This method will <b>not check for key conflicts</b> with duplicate values in the inner collections, neither in
      * the same collection, nor in collections across differnt keys.
      *
      * @param inputMap The map to be reveresed.
-     * @param <K> The key type.
-     * @param <V> The value type.
+     * @param <K>      The key type.
+     * @param <V>      The value type.
      * @return A new {@link HashMap} containing the reversed, flattened mapping.
      */
     public static <K, V> HashMap<V, K> reverseMapFlat(Map<K, Collection<V>> inputMap) {

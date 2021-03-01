@@ -102,18 +102,12 @@
             <artifactId>json</artifactId>
             <version>20190722</version>
         </dependency>
-<!-- FIXME: Change back to GitHub version of typesystem once updated -->
         <dependency>
-            <groupId>org.texttechnologylab.annotation</groupId>
-            <artifactId>typesystem</artifactId>
-            <version>1.8.9</version>
+            <groupId>com.github.texttechnologylab</groupId>
+            <artifactId>UIMATypeSystem</artifactId>
+            <version>1.8.9.1</version>
+            <scope>compile</scope>
         </dependency>
-<!--        <dependency>-->
-<!--            <groupId>com.github.texttechnologylab</groupId>-->
-<!--            <artifactId>UIMATypeSystem</artifactId>-->
-<!--            <version>1.8.9</version>-->
-<!--            <scope>compile</scope>-->
-<!--        </dependency>-->
         <dependency>
             <groupId>com.github.texttechnologylab</groupId>
             <artifactId>Utilities</artifactId>
