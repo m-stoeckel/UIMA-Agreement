@@ -195,7 +195,17 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
 
             if (pPrintStatistics) {
                 System.out.printf("%s,%s filtering 'Processed' samples\n", StringUtils.appendIfMissing(DocumentMetaData.get(jCas).getDocumentId(), ".xmi"), pFilterProcessed ? "" : " not");
-                printStatistics(predicateIdentificationStudy, perCasTTLabPredicateDisambiguationStudy, perCasPropBankPredicateDisambiguationStudy, perCasPropBankArgumentIdentificationStudy, perCasPropBankArgumentClassificationStudy, perCasPropBankArgumentClassificationMatchingSpansStudy, perCasTTLabArgumentIdentificationStudy, perCasTTLabArgumentClassificationStudy, perCasTTLabArgumentClassificationMatchingSpansStudy);
+                printStatistics(
+                        predicateIdentificationStudy,
+                        perCasTTLabPredicateDisambiguationStudy,
+                        perCasPropBankPredicateDisambiguationStudy,
+                        perCasPropBankArgumentIdentificationStudy,
+                        perCasPropBankArgumentClassificationStudy,
+                        perCasPropBankArgumentClassificationMatchingSpansStudy,
+                        perCasTTLabArgumentIdentificationStudy,
+                        perCasTTLabArgumentClassificationStudy,
+                        perCasTTLabArgumentClassificationMatchingSpansStudy
+                );
             }
 
             documentOffset.getAndAdd(documentLength);
@@ -211,20 +221,33 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
         }
     }
 
-    private void printStatistics(CodingAnnotationStudy predicateIdentificationStudy, CodingAnnotationStudy perCasTTLabPredicateDisambiguationStudy, CodingAnnotationStudy perCasPropBankPredicateDisambiguationStudy, UnitizingAnnotationStudy perCasPropBankArgumentIdentificationStudy, UnitizingAnnotationStudy perCasPropBankArgumentClassificationStudy, UnitizingAnnotationStudy perCasPropBankArgumentClassificationMatchingSpansStudy, UnitizingAnnotationStudy perCasTTLabArgumentClassificationStudy, UnitizingAnnotationStudy perCasTTLabArgumentClassificationMatchingSpansStudy) {
+    private void printStatistics(
+            CodingAnnotationStudy predicateIdentificationStudy,
+            CodingAnnotationStudy perCasTTLabPredicateDisambiguationStudy,
+            CodingAnnotationStudy perCasPropBankPredicateDisambiguationStudy,
+            UnitizingAnnotationStudy perCasPropBankArgumentIdentificationStudy,
+            UnitizingAnnotationStudy perCasPropBankArgumentClassificationStudy,
+            UnitizingAnnotationStudy perCasPropBankArgumentClassificationMatchingSpansStudy,
+            UnitizingAnnotationStudy perCasTTLabArgumentIdentificationStudy,
+            UnitizingAnnotationStudy perCasTTLabArgumentClassificationStudy,
+            UnitizingAnnotationStudy perCasTTLabArgumentClassificationMatchingSpansStudy
+    ) {
         long predicateIdentificationPositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).anyMatch(Predicate.isEqual("P"))).count();
         long predicateIdentificationDoublePositiveSamples = Streams.stream(predicateIdentificationStudy.getItems()).filter(i -> Streams.stream(i.getUnits()).map(IAnnotationUnit::getCategory).allMatch(Predicate.isEqual("P"))).count();
-        System.out.printf("Predicate Identification Agreement: %f, %d items, %d double positive\n", new KrippendorffAlphaAgreement(predicateIdentificationStudy, new NominalDistanceFunction()).calculateAgreement(), predicateIdentificationPositiveSamples, predicateIdentificationDoublePositiveSamples);
-        System.out.println("Predicate Disambiguation Agreement");
-        System.out.printf("  TTLab:    %f, %d items\n", new KrippendorffAlphaAgreement(perCasTTLabPredicateDisambiguationStudy, new NominalDistanceFunction()).calculateAgreement(), perCasTTLabPredicateDisambiguationStudy.getItemCount());
-        System.out.printf("  PropBank: %f, %d items\n", new KrippendorffAlphaAgreement(perCasPropBankPredicateDisambiguationStudy, new NominalDistanceFunction()).calculateAgreement(), perCasPropBankPredicateDisambiguationStudy.getItemCount());
-        System.out.printf("Argument Identification Agreement: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentIdentificationStudy).calculateAgreement(), perCasPropBankArgumentIdentificationStudy.getUnitCount());
-        System.out.println("Argument Classification Agreement (PropBank)");
-        System.out.printf("  All Spans:      %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentClassificationStudy).calculateAgreement(), perCasPropBankArgumentClassificationStudy.getUnitCount());
-        System.out.printf("  Matching Spans: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasPropBankArgumentClassificationMatchingSpansStudy.getUnitCount());
-        System.out.println("Argument Classification Agreement (TTLab)");
-        System.out.printf("  All Spans:      %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentClassificationStudy).calculateAgreement(), perCasTTLabArgumentClassificationStudy.getUnitCount());
-        System.out.printf("  Matching Spans: %f, %d units\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasTTLabArgumentClassificationMatchingSpansStudy.getUnitCount());
+        System.out.println("Predicate Identification                 && \\\\");
+        System.out.printf("$\\quad$ All                              & %01.6f & %d items, %d double positive \\\\\n", new KrippendorffAlphaAgreement(predicateIdentificationStudy, new NominalDistanceFunction()).calculateAgreement(), predicateIdentificationPositiveSamples, predicateIdentificationDoublePositiveSamples);
+        System.out.println("Predicate Disambiguation                 && \\\\");
+        System.out.printf("$\\quad$ TTLab                            & %01.6f & %d items \\\\\n", new KrippendorffAlphaAgreement(perCasTTLabPredicateDisambiguationStudy, new NominalDistanceFunction()).calculateAgreement(), perCasTTLabPredicateDisambiguationStudy.getItemCount());
+        System.out.printf("$\\quad$ PropBank                         & %01.6f & %d items \\\\\n", new KrippendorffAlphaAgreement(perCasPropBankPredicateDisambiguationStudy, new NominalDistanceFunction()).calculateAgreement(), perCasPropBankPredicateDisambiguationStudy.getItemCount());
+        System.out.println("Argument Identification                  && \\\\");
+        System.out.printf("$\\quad$ TTLab                            & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentIdentificationStudy).calculateAgreement(), perCasPropBankArgumentIdentificationStudy.getUnitCount());
+        System.out.printf("$\\quad$ PropBank                         & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentIdentificationStudy).calculateAgreement(), perCasPropBankArgumentIdentificationStudy.getUnitCount());
+        System.out.println("Argument Classification (All)            && \\\\");
+        System.out.printf("$\\quad$ TTLab                            & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentClassificationStudy).calculateAgreement(), perCasTTLabArgumentClassificationStudy.getUnitCount());
+        System.out.printf("$\\quad$ PropBank                         & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentClassificationStudy).calculateAgreement(), perCasPropBankArgumentClassificationStudy.getUnitCount());
+        System.out.println("Argument Classification (Matching Spans) && \\\\");
+        System.out.printf("$\\quad$ TTLab                            & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasTTLabArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasTTLabArgumentClassificationMatchingSpansStudy.getUnitCount());
+        System.out.printf("$\\quad$ PropBank                         & %01.6f & %d units \\\\\n", new KrippendorffAlphaUnitizingAgreement(perCasPropBankArgumentClassificationMatchingSpansStudy).calculateAgreement(), perCasPropBankArgumentClassificationMatchingSpansStudy.getUnitCount());
         System.out.flush();
     }
 
