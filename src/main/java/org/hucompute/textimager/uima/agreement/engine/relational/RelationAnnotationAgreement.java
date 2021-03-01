@@ -13,6 +13,7 @@ import org.apache.commons.lang3.tuple.ImmutablePair;
 import org.apache.uima.UimaContext;
 import org.apache.uima.analysis_engine.AnalysisEngineProcessException;
 import org.apache.uima.cas.CASException;
+import org.apache.uima.fit.descriptor.ConfigurationParameter;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.TOP;
@@ -28,6 +29,7 @@ import org.dkpro.statistics.agreement.unitizing.KrippendorffAlphaUnitizingAgreem
 import org.dkpro.statistics.agreement.unitizing.UnitizingAnnotationStudy;
 import org.hucompute.textimager.uima.agreement.engine.AbstractIAAEngine;
 import org.texttechnologylab.annotation.SemanticSource;
+import org.texttechnologylab.annotation.administration.AnnotationStatus;
 import org.texttechnologylab.annotation.semaf.isobase.Entity;
 import org.texttechnologylab.annotation.semaf.isobase.Event;
 import org.texttechnologylab.annotation.semaf.isobase.Link;
@@ -51,6 +53,16 @@ import java.util.stream.Collectors;
         }
 )
 public class RelationAnnotationAgreement extends AbstractIAAEngine {
+
+    public static final String PARAM_FILTER_PROCESSED = "pFilterProcessed";
+    @ConfigurationParameter(
+            name = PARAM_FILTER_PROCESSED,
+            defaultValue = "true",
+            description = "If set to true, only consider predicates that are covered by a AnnotationStatus annotation " +
+                    "with status='Processed'"
+    )
+    protected boolean pFilterProcessed;
+
 
     private TreeSet<String> categories = new TreeSet<>();
     private AtomicInteger documentOffset = new AtomicInteger(0);
@@ -182,8 +194,8 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
             }
 
             if (pPrintStatistics) {
-                System.out.printf("%s\n", StringUtils.appendIfMissing(DocumentMetaData.get(jCas).getDocumentId(), ".xmi"));
-                printStatistics(predicateIdentificationStudy, perCasTTLabPredicateDisambiguationStudy, perCasPropBankPredicateDisambiguationStudy, perCasPropBankArgumentIdentificationStudy, perCasPropBankArgumentClassificationStudy, perCasPropBankArgumentClassificationMatchingSpansStudy, perCasTTLabArgumentClassificationStudy, perCasTTLabArgumentClassificationMatchingSpansStudy);
+                System.out.printf("%s,%s filtering 'Processed' samples\n", StringUtils.appendIfMissing(DocumentMetaData.get(jCas).getDocumentId(), ".xmi"), pFilterProcessed ? "" : " not");
+                printStatistics(predicateIdentificationStudy, perCasTTLabPredicateDisambiguationStudy, perCasPropBankPredicateDisambiguationStudy, perCasPropBankArgumentIdentificationStudy, perCasPropBankArgumentClassificationStudy, perCasPropBankArgumentClassificationMatchingSpansStudy, perCasTTLabArgumentIdentificationStudy, perCasTTLabArgumentClassificationStudy, perCasTTLabArgumentClassificationMatchingSpansStudy);
             }
 
             documentOffset.getAndAdd(documentLength);
@@ -430,6 +442,17 @@ public class RelationAnnotationAgreement extends AbstractIAAEngine {
             // Each relational annotation consists of a Link between a ground and a figure/trigger of (base-)class Entity
             this.links = getLinks(viewCas, fingerprinted);
             this.predicates = this.links.stream().map(Link::getFigure).distinct().collect(Collectors.toCollection(ArrayList::new));
+            if (pFilterProcessed) {
+                List<AnnotationStatus> annotationStatusProcessed = JCasUtil.select(viewCas, AnnotationStatus.class).stream()
+                        .filter(status -> "Processed".equals(status.getStatus()))
+                        .collect(Collectors.toList());
+
+                List<Entity> annotationStatusProcessedEntities = Maps.filterKeys(
+                        JCasUtil.indexCovered(viewCas, AnnotationStatus.class, Entity.class),
+                        annotationStatusProcessed::contains
+                ).values().stream().flatMap(Collection::stream).collect(Collectors.toList());
+                this.predicates.retainAll(annotationStatusProcessedEntities);
+            }
             this.arguments = this.links.stream().map(Link::getGround).collect(Collectors.toCollection(ArrayList::new));
 
             this.entitySemanticSourceLookup = Maps.filterValues(

@@ -45,7 +45,7 @@ public class RelationAgreementTest {
                     RelationAnnotationAgreement.PARAM_FILTER_FINGERPRINTED, filterFingerprinted,
                     RelationAnnotationAgreement.PARAM_MULTI_CAS_HANDLING, RelationAnnotationAgreement.BOTH,
                     RelationAnnotationAgreement.PARAM_PRINT_STATS, true,
-//					RelationAnnotationAgreement.PARAM_MIN_ANNOTATIONS, 10,
+					RelationAnnotationAgreement.PARAM_FILTER_PROCESSED, true,
                     RelationAnnotationAgreement.PARAM_TARGET_LOCATION, "src/test/resources/out/relational"
             ));
             SimplePipeline.runPipeline(collection, ab.createAggregate());
